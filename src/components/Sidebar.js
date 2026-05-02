@@ -1,4 +1,5 @@
 import React from 'react'
+import { supabase } from '../lib/supabase'
 
 const nav = [
   { id: 'dashboard', label: 'Dashboard', path: '/dashboard' },
@@ -8,6 +9,11 @@ const nav = [
 ]
 
 export default function Sidebar({ active }) {
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
+    window.location.href = '/login'
+  }
+
   return (
     <div style={{width:'220px',background:'#1e293b',borderRight:'1px solid #334155',padding:'1.5rem 1rem',display:'flex',flexDirection:'column',flexShrink:0}}>
       <div style={{marginBottom:'2rem',paddingLeft:'8px'}}>
@@ -16,15 +22,18 @@ export default function Sidebar({ active }) {
       </div>
       <nav style={{display:'flex',flexDirection:'column',gap:'4px'}}>
         {nav.map(n => (
-          <a key={n.id} href={n.path} style={{padding:'10px 12px',borderRadius:'8px',color: active===n.id ? '#f1f5f9' : '#64748b',background: active===n.id ? '#334155' : 'transparent',textDecoration:'none',fontSize:'14px',fontWeight: active===n.id ? '600' : '400',transition:'all 0.15s'}}>
+          <a key={n.id} href={n.path} style={{padding:'10px 12px',borderRadius:'8px',color: active===n.id ? '#f1f5f9' : '#64748b',background: active===n.id ? '#334155' : 'transparent',textDecoration:'none',fontSize:'14px',fontWeight: active===n.id ? '600' : '400'}}>
             {n.label}
           </a>
         ))}
       </nav>
-      <div style={{marginTop:'auto',padding:'12px',background:'#0f172a',borderRadius:'8px',border:'1px solid #334155'}}>
-        <div style={{color:'#94a3b8',fontSize:'12px'}}>Logged in as</div>
-        <div style={{color:'#f1f5f9',fontSize:'13px',fontWeight:'600',marginTop:'2px'}}>David</div>
-        <div style={{color:'#64748b',fontSize:'11px'}}>Owner</div>
+      <div style={{marginTop:'auto'}}>
+        <div style={{padding:'12px',background:'#0f172a',borderRadius:'8px',border:'1px solid #334155',marginBottom:'8px'}}>
+          <div style={{color:'#94a3b8',fontSize:'12px'}}>Logged in as</div>
+          <div style={{color:'#f1f5f9',fontSize:'13px',fontWeight:'600',marginTop:'2px'}}>David</div>
+          <div style={{color:'#64748b',fontSize:'11px'}}>Owner</div>
+        </div>
+        <button onClick={handleLogout} style={{width:'100%',padding:'10px',background:'transparent',border:'1px solid #334155',borderRadius:'8px',color:'#64748b',fontSize:'13px',cursor:'pointer'}}>Sign Out</button>
       </div>
     </div>
   )
