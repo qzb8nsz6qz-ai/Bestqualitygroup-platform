@@ -1,38 +1,62 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import Sidebar from '../components/Sidebar'
-
-const initialProjects = [
-  { id:1, name:'Johnson Residence', client:'Todd Campbell Custom Homes', type:'Painting', value:'$5,600', status:'In Progress', notes:'Exterior cedar siding day 3/5' },
-  { id:2, name:'White Swan Project', client:'Todd Campbell Custom Homes', type:'Procurement', value:'$24,600', status:'Estimate', notes:'Cabinets and doors, awaiting approval' },
-  { id:3, name:'Best Western North Lodge', client:'Andy', type:'Painting', value:'$48,000', status:'Approved', notes:'PIP full hotel interior' },
-  { id:4, name:'Pizzeria CA', client:'CA Seller', type:'Advisory', value:'$75,000', status:'Active', notes:'MCA negotiation in progress' },
-  { id:5, name:'Meridian New Build', client:'Sun Valley Builders', type:'Painting', value:'$18,000', status:'In Progress', notes:'Full interior new construction day 7/14' },
-]
+import { supabase } from '../lib/supabase'
 
 const statusColors = {
-  'Estimate':'#f59e0b','Approved':'#3b82f6','In Progress':'#22c55e','Active':'#a855f7','Complete':'#64748b'
+  'Estimate':'#f59e0b','Approved':'#3b82f6','In Progress':'#22c55e','Complete':'#64748b','Active':'#a855f7'
 }
-
 const typeColors = {
   'Painting':'#22c55e','Procurement':'#3b82f6','Advisory':'#f59e0b'
 }
+const stages = ['Estimate','Approved','In Progress','Complete']
 
 export default function Projects() {
-  const [projects, setProjects] = useState(initialProjects)
+  const [projects, setProjects] = useState([])
   const [filter, setFilter] = useState('All')
   const [showForm, setShowForm] = useState(false)
+  const [selected, setSelected] = useState(null)
+  const [comment, setComment] = useState('')
+  const [comments, setComments] = useState({})
+  const [loading, setLoading] = useState(true)
   const [form, setForm] = useState({ name:'', client:'', type:'Painting', value:'', status:'Estimate', notes:'' })
 
-  const filtered = filter === 'All' ? projects : projects.filter(p => p.type === filter)
+  useEffect(() => { fetchProjects() }, [])
 
-  const addProject = () => {
+  const fetchProjects = async () => {
+    setLoading(true)
+    const { data } = await supabase.from('projects').select('*').order('created_at', { ascending: false })
+    if (data) setProjects(data)
+    setLoading(false)
+  }
+
+  const addProject = async () => {
     if (!form.name) return
-    setProjects([...projects, { ...form, id: Date.now() }])
+    const { data } = await supabase.from('projects').insert([form]).select()
+    if (data) setProjects([data[0], ...projects])
     setForm({ name:'', client:'', type:'Painting', value:'', status:'Estimate', notes:'' })
     setShowForm(false)
   }
 
-  const deleteProject = (id) => setProjects(projects.filter(p => p.id !== id))
+  const deleteProject = async (id) => {
+    await supabase.from('projects').delete().eq('id', id)
+    setProjects(projects.filter(p => p.id !== id))
+    if (selected?.id === id) setSelected(null)
+  }
+
+  const updateStatus = async (id, status) => {
+    await supabase.from('projects').update({ status }).eq('id', id)
+    setProjects(projects.map(p => p.id === id ? { ...p, status } : p))
+    if (selected?.id === id) setSelected({ ...selected, status })
+  }
+
+  const addComment = (id) => {
+    if (!comment.trim()) return
+    const time = new Date().toLocaleString()
+    setComments({ ...comments, [id]: [...(comments[id] || []), { text: comment, time }] })
+    setComment('')
+  }
+
+  const filtered = filter === 'All' ? projects : projects.filter(p => p.type === filter)
 
   return (
     <div style={{display:'flex',minHeight:'100vh',background:'#0f172a'}}>
@@ -56,22 +80,16 @@ export default function Projects() {
           <div style={{background:'#1e293b',borderRadius:'12px',padding:'20px',border:'1px solid #334155',marginBottom:'1.5rem'}}>
             <h3 style={{color:'#f1f5f9',fontSize:'15px',fontWeight:'600',marginBottom:'16px'}}>New Project</h3>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'12px'}}>
-              {[['Project Name','name','text'],['Client','client','text'],['Value','value','text']].map(([label,key,type]) => (
+              {[['Project Name','name'],['Client','client'],['Value','value']].map(([label,key]) => (
                 <div key={key}>
                   <label style={{color:'#94a3b8',fontSize:'12px',display:'block',marginBottom:'4px'}}>{label}</label>
-                  <input type={type} value={form[key]} onChange={e=>setForm({...form,[key]:e.target.value})} style={{width:'100%',padding:'8px 12px',background:'#0f172a',border:'1px solid #334155',borderRadius:'8px',color:'#f1f5f9',fontSize:'13px',boxSizing:'border-box'}} />
+                  <input value={form[key]} onChange={e=>setForm({...form,[key]:e.target.value})} style={{width:'100%',padding:'8px 12px',background:'#0f172a',border:'1px solid #334155',borderRadius:'8px',color:'#f1f5f9',fontSize:'13px',boxSizing:'border-box'}} />
                 </div>
               ))}
               <div>
                 <label style={{color:'#94a3b8',fontSize:'12px',display:'block',marginBottom:'4px'}}>Type</label>
                 <select value={form.type} onChange={e=>setForm({...form,type:e.target.value})} style={{width:'100%',padding:'8px 12px',background:'#0f172a',border:'1px solid #334155',borderRadius:'8px',color:'#f1f5f9',fontSize:'13px'}}>
                   <option>Painting</option><option>Procurement</option><option>Advisory</option>
-                </select>
-              </div>
-              <div>
-                <label style={{color:'#94a3b8',fontSize:'12px',display:'block',marginBottom:'4px'}}>Status</label>
-                <select value={form.status} onChange={e=>setForm({...form,status:e.target.value})} style={{width:'100%',padding:'8px 12px',background:'#0f172a',border:'1px solid #334155',borderRadius:'8px',color:'#f1f5f9',fontSize:'13px'}}>
-                  <option>Estimate</option><option>Approved</option><option>In Progress</option><option>Active</option><option>Complete</option>
                 </select>
               </div>
               <div style={{gridColumn:'1/-1'}}>
@@ -86,21 +104,61 @@ export default function Projects() {
           </div>
         )}
 
-        <div style={{display:'flex',flexDirection:'column',gap:'10px'}}>
-          {filtered.map(p => (
-            <div key={p.id} style={{background:'#1e293b',borderRadius:'12px',padding:'16px 20px',border:'1px solid #334155',display:'flex',alignItems:'center',gap:'16px'}}>
-              <div style={{flex:1}}>
-                <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'4px'}}>
-                  <span style={{color:'#f1f5f9',fontSize:'14px',fontWeight:'600'}}>{p.name}</span>
-                  <span style={{fontSize:'11px',padding:'2px 8px',borderRadius:'99px',background: typeColors[p.type]+'22',color: typeColors[p.type]}}>{p.type}</span>
-                  <span style={{fontSize:'11px',padding:'2px 8px',borderRadius:'99px',background: statusColors[p.status]+'22',color: statusColors[p.status]}}>{p.status}</span>
+        <div style={{display:'grid',gridTemplateColumns: selected ? '1fr 380px' : '1fr',gap:'16px'}}>
+          <div style={{display:'flex',flexDirection:'column',gap:'10px'}}>
+            {loading ? <div style={{color:'#64748b',fontSize:'14px'}}>Loading projects...</div> :
+            filtered.map(p => (
+              <div key={p.id} onClick={()=>setSelected(selected?.id===p.id ? null : p)} style={{background: selected?.id===p.id ? '#1e3a5f' : '#1e293b',borderRadius:'12px',padding:'16px 20px',border:`1px solid ${selected?.id===p.id ? '#3b82f6' : '#334155'}`,display:'flex',alignItems:'center',gap:'16px',cursor:'pointer',transition:'all 0.15s'}}>
+                <div style={{flex:1}}>
+                  <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'4px'}}>
+                    <span style={{color:'#f1f5f9',fontSize:'14px',fontWeight:'600'}}>{p.name}</span>
+                    <span style={{fontSize:'11px',padding:'2px 8px',borderRadius:'99px',background: typeColors[p.type]+'22',color: typeColors[p.type]}}>{p.type}</span>
+                    <span style={{fontSize:'11px',padding:'2px 8px',borderRadius:'99px',background: statusColors[p.status]+'22',color: statusColors[p.status]}}>{p.status}</span>
+                  </div>
+                  <div style={{color:'#64748b',fontSize:'12px'}}>{p.client} · {p.notes}</div>
                 </div>
-                <div style={{color:'#64748b',fontSize:'12px'}}>{p.client} · {p.notes}</div>
+                <div style={{color:'#f1f5f9',fontSize:'15px',fontWeight:'700'}}>{p.value}</div>
+                <button onClick={e=>{e.stopPropagation();deleteProject(p.id)}} style={{padding:'6px 12px',background:'transparent',border:'1px solid #334155',borderRadius:'6px',color:'#64748b',fontSize:'12px',cursor:'pointer'}}>Delete</button>
               </div>
-              <div style={{color:'#f1f5f9',fontSize:'15px',fontWeight:'700',minWidth:'80px',textAlign:'right'}}>{p.value}</div>
-              <button onClick={()=>deleteProject(p.id)} style={{padding:'6px 12px',background:'transparent',border:'1px solid #334155',borderRadius:'6px',color:'#64748b',fontSize:'12px',cursor:'pointer'}}>Delete</button>
+            ))}
+          </div>
+
+          {selected && (
+            <div style={{background:'#1e293b',borderRadius:'12px',border:'1px solid #334155',padding:'20px',height:'fit-content',position:'sticky',top:'0'}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'16px'}}>
+                <h3 style={{color:'#f1f5f9',fontSize:'15px',fontWeight:'600'}}>{selected.name}</h3>
+                <button onClick={()=>setSelected(null)} style={{background:'none',border:'none',color:'#64748b',fontSize:'18px',cursor:'pointer'}}>×</button>
+              </div>
+
+              <div style={{marginBottom:'16px'}}>
+                <div style={{color:'#94a3b8',fontSize:'11px',textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:'8px'}}>Move Stage</div>
+                <div style={{display:'flex',flexDirection:'column',gap:'6px'}}>
+                  {stages.map(s => (
+                    <button key={s} onClick={()=>updateStatus(selected.id, s)} style={{padding:'8px 12px',borderRadius:'8px',border:'1px solid',borderColor: selected.status===s ? statusColors[s] : '#334155',background: selected.status===s ? statusColors[s]+'22' : 'transparent',color: selected.status===s ? statusColors[s] : '#64748b',fontSize:'13px',cursor:'pointer',textAlign:'left',fontWeight: selected.status===s ? '600' : '400'}}>
+                      {selected.status===s ? '● ' : '○ '}{s}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <div style={{color:'#94a3b8',fontSize:'11px',textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:'8px'}}>Comments</div>
+                <div style={{display:'flex',flexDirection:'column',gap:'8px',marginBottom:'10px',maxHeight:'200px',overflowY:'auto'}}>
+                  {(comments[selected.id] || []).length === 0 && <div style={{color:'#475569',fontSize:'12px'}}>No comments yet</div>}
+                  {(comments[selected.id] || []).map((c,i) => (
+                    <div key={i} style={{background:'#0f172a',borderRadius:'8px',padding:'10px',border:'1px solid #334155'}}>
+                      <div style={{color:'#f1f5f9',fontSize:'13px'}}>{c.text}</div>
+                      <div style={{color:'#475569',fontSize:'11px',marginTop:'4px'}}>{c.time}</div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{display:'flex',gap:'8px'}}>
+                  <input value={comment} onChange={e=>setComment(e.target.value)} onKeyDown={e=>e.key==='Enter'&&addComment(selected.id)} placeholder="Add a comment..." style={{flex:1,padding:'8px 12px',background:'#0f172a',border:'1px solid #334155',borderRadius:'8px',color:'#f1f5f9',fontSize:'13px'}} />
+                  <button onClick={()=>addComment(selected.id)} style={{padding:'8px 14px',background:'#3b82f6',border:'none',borderRadius:'8px',color:'white',fontSize:'13px',cursor:'pointer'}}>Add</button>
+                </div>
+              </div>
             </div>
-          ))}
+          )}
         </div>
       </main>
     </div>
